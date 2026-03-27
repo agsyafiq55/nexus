@@ -83,6 +83,46 @@ const commands = {
     const result = await web.auth.test();
     console.log(`Authenticated as: ${result.user}`);
     console.log(`Team: ${result.team}`);
+  },
+
+  async files(channelId, limit = 10) {
+    const result = await web.files.list({
+      channel: channelId,
+      limit: parseInt(limit)
+    });
+    result.files.forEach(f => {
+      const date = new Date(f.timestamp * 1000).toLocaleString();
+      console.log(`${date} | ${f.name} | ${f.id} | ${(f.size / 1024).toFixed(1)}KB`);
+    });
+  },
+
+  async download(fileId, outputPath) {
+    const fs = require('fs');
+    const path = require('path');
+
+    // Get file info
+    const result = await web.files.info({ file: fileId });
+    const file = result.file;
+
+    if (!file.url_private) {
+      throw new Error('No download URL available for this file');
+    }
+
+    // Download file
+    const response = await fetch(file.url_private, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+
+    const dest = outputPath || file.name;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(dest, buffer);
+
+    console.log(`Downloaded: ${file.name} → ${path.resolve(dest)}`);
+    console.log(`Size: ${(file.size / 1024).toFixed(1)}KB`);
   }
 };
 
@@ -98,6 +138,8 @@ Commands:
   read-name <name> [limit]    Read messages by channel name
   send <channel> <text>       Send message to channel
   replies <channelId> <ts>    Read thread replies
+  files <channelId> [limit]   List files in channel
+  download <fileId> [path]    Download file by ID
   user <userId>               Get user info
   test                        Test authentication
 
@@ -133,6 +175,14 @@ Environment:
         break;
       case 'test':
         await commands.test();
+        break;
+      case 'files':
+        if (!args[0]) throw new Error('Channel ID required');
+        await commands.files(args[0], args[1]);
+        break;
+      case 'download':
+        if (!args[0]) throw new Error('File ID required');
+        await commands.download(args[0], args[1]);
         break;
       default:
         console.error(`Unknown command: ${cmd}`);

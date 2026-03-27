@@ -23,6 +23,8 @@ node .claude/skills/read-slack/slack-cli.js <command> [args]
 | `read-name <name> [limit]` | Read by channel name | `node slack-cli.js read-name project-go 5` |
 | `send <channel> <text>` | Send a message | `node slack-cli.js send '#general' 'Hello'` |
 | `replies <channelId> <ts>` | Read thread replies | `node slack-cli.js replies C0A11MKGDT2 123.456` |
+| `files <channelId> [limit]` | List files in channel | `node slack-cli.js files C0A11MKGDT2 10` |
+| `download <fileId> [path]` | Download attachment | `node slack-cli.js download F12345678 ./file.pdf` |
 | `user <userId>` | Get user info | `node slack-cli.js user U09RHS37RDF` |
 | `test` | Test authentication | `node slack-cli.js test` |
 
@@ -38,6 +40,7 @@ Get your token from https://api.slack.com/apps:
    - `channels:history`, `groups:history`, `im:history`, `mpim:history`
    - `channels:read`, `groups:read`, `users:read`
    - `chat:write`
+   - `files:read`
 3. Install to workspace (as yourself)
 4. Copy "User OAuth Token" (starts with `xoxp-`)
 
@@ -49,6 +52,8 @@ Get your token from https://api.slack.com/apps:
 | `web.conversations.history()` | Read messages |
 | `web.conversations.replies()` | Read thread replies |
 | `web.chat.postMessage()` | Send message |
+| `web.files.list()` | List files in channel |
+| `web.files.info()` | Get file metadata |
 | `web.users.info()` | Get user details |
 | `web.auth.test()` | Verify token |
 
