@@ -1214,8 +1214,9 @@
       </div>
     </div>
     <div class="buttons">
-      <button id="openTaskBtn">Select File</button>
-      <button id="openMemoryBtn" style="display: none;">Open Folder</button>
+      <button id="openTaskBtn">Select Folder</button>
+      <button id="reconnectWorkspaceBtn" style="display: none;">Reconnect Last Folder</button>
+      <button id="openMemoryBtn" style="display: none;">Select Folder</button>
       <button id="refreshMemoryBtn" style="display: none;">↺ Refresh</button>
       <button id="saveBtn" class="primary" disabled style="display: none;">Save</button>
     </div>
@@ -1226,8 +1227,8 @@
     <div class="list-view" id="listView" style="display: none;"></div>
     <div class="board" id="board">
       <div class="empty-state" id="boardEmptyState" style="width: 100%;">
-        <p style="margin-bottom: 24px; font-size: 18px; font-weight: 600; color: var(--text-primary);">Select your TASKS.md file</p>
-        <button id="openBtnLarge">Select TASKS.md</button>
+        <p style="margin-bottom: 24px; font-size: 18px; font-weight: 600; color: var(--text-primary);">Select your project folder to auto-load TASKS.md</p>
+        <button id="openBtnLarge">Select Folder</button>
       </div>
     </div>
   </div>
@@ -1283,6 +1284,7 @@
     const memoryPanel = document.getElementById('memoryPanel');
     const taskViewToggle = document.getElementById('taskViewToggle');
     const openTaskBtn = document.getElementById('openTaskBtn');
+    const reconnectWorkspaceBtn = document.getElementById('reconnectWorkspaceBtn');
     const openMemoryBtn = document.getElementById('openMemoryBtn');
     const refreshMemoryBtn = document.getElementById('refreshMemoryBtn');
     const saveBtn = document.getElementById('saveBtn');
@@ -1301,6 +1303,7 @@
 
       // Show/hide appropriate buttons
       openTaskBtn.style.display = tab === 'tasks' ? 'inline-flex' : 'none';
+      reconnectWorkspaceBtn.style.display = (tab === 'tasks' && lastWorkspaceHandle) ? 'inline-flex' : 'none';
       openMemoryBtn.style.display = tab === 'memory' ? 'inline-flex' : 'none';
       refreshMemoryBtn.style.display = (tab === 'memory' && memoryDirHandle) ? 'inline-flex' : 'none';
       saveBtn.style.display = tab === 'tasks' ? 'inline-flex' : 'none';
@@ -1335,6 +1338,7 @@
     const listView = document.getElementById('listView');
     const listViewBtn = document.getElementById('listViewBtn');
     const boardViewBtn = document.getElementById('boardViewBtn');
+    const boardEmptyState = document.getElementById('boardEmptyState');
 
     function taskSectionId(name) {
       return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -2469,29 +2473,176 @@
       input.addEventListener('blur', saveSection);
     }
 
+    async function loadTaskFromHandle(fileHandle, options = {}) {
+      const { announce = true } = options;
+      const file = await fileHandle.getFile();
+      const content = await file.text();
+      lastModified = file.lastModified;
+      const result = parseTaskMarkdown(content);
+      sections = result.sections;
+      tasks = result.tasks;
+      taskFileHandle = fileHandle;
+      taskFileName = file.name;
+      switchTaskView('board');
+      startWatching();
+      boardEmptyState.style.display = 'none';
+      if (activeMainTab === 'tasks') filePathEl.textContent = file.name;
+      if (announce) showStatus('Loaded ' + file.name);
+    }
+
+    async function loadTasksFromDirectory(dirHandle, options = {}) {
+      const { announce = true } = options;
+      try {
+        const fileHandle = await dirHandle.getFileHandle('TASKS.md');
+        await loadTaskFromHandle(fileHandle, { announce });
+        return true;
+      } catch (e) {
+        if (e.name !== 'NotFoundError' && announce) showStatus('Error loading TASKS.md: ' + e.message);
+        return false;
+      }
+    }
+
     async function openTaskFile() {
       try {
         [taskFileHandle] = await window.showOpenFilePicker({
           types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }]
         });
-        const file = await taskFileHandle.getFile();
-        const content = await file.text();
-        lastModified = file.lastModified;
-        const result = parseTaskMarkdown(content);
-        sections = result.sections;
-        tasks = result.tasks;
-        switchTaskView('board');
-        startWatching();
-        taskFileName = file.name;
-        filePathEl.textContent = file.name;
-        showStatus('Loaded ' + file.name);
+        await loadTaskFromHandle(taskFileHandle);
       } catch (e) {
         if (e.name !== 'AbortError') { showStatus('Error: ' + e.message); }
       }
     }
 
-    openTaskBtn.addEventListener('click', openTaskFile);
-    document.getElementById('openBtnLarge')?.addEventListener('click', openTaskFile);
+    const HANDLE_DB_NAME = 'productivity-dashboard-handles';
+    const HANDLE_STORE_NAME = 'handles';
+    const WORKSPACE_HANDLE_KEY = 'workspaceDir';
+    let lastWorkspaceHandle = null;
+
+    function openHandleDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(HANDLE_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(HANDLE_STORE_NAME)) {
+            db.createObjectStore(HANDLE_STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function saveWorkspaceHandle(dirHandle) {
+      const db = await openHandleDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(HANDLE_STORE_NAME, 'readwrite');
+        tx.objectStore(HANDLE_STORE_NAME).put(dirHandle, WORKSPACE_HANDLE_KEY);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    }
+
+    async function getSavedWorkspaceHandle() {
+      const db = await openHandleDb();
+      const handle = await new Promise((resolve, reject) => {
+        const tx = db.transaction(HANDLE_STORE_NAME, 'readonly');
+        const req = tx.objectStore(HANDLE_STORE_NAME).get(WORKSPACE_HANDLE_KEY);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+      db.close();
+      return handle;
+    }
+
+    async function loadWorkspaceFromHandle(dirHandle, options = {}) {
+      const { announce = true, remember = false } = options;
+      const taskLoaded = await loadTasksFromDirectory(dirHandle, { announce: false });
+      const memoryLoaded = await loadMemoryFromHandle(dirHandle, { announce: false });
+
+      if (remember) {
+        try { await saveWorkspaceHandle(dirHandle); } catch (e) { console.log('Could not persist workspace handle', e); }
+      }
+
+      if (activeMainTab === 'tasks' && taskLoaded) {
+        filePathEl.textContent = taskFileName;
+      } else if (activeMainTab === 'memory' && memoryLoaded) {
+        filePathEl.textContent = dirHandle.name;
+      }
+
+      if (announce) {
+        if (taskLoaded && memoryLoaded) {
+          showStatus('Loaded TASKS.md and memory from ' + dirHandle.name);
+        } else if (taskLoaded) {
+          showStatus('Loaded TASKS.md from ' + dirHandle.name + ' (no memory/ found)');
+        } else if (memoryLoaded) {
+          showStatus('Loaded memory from ' + dirHandle.name + ' (no TASKS.md found)');
+        } else {
+          showStatus('No TASKS.md or memory data found in ' + dirHandle.name);
+        }
+      }
+
+      return { taskLoaded, memoryLoaded };
+    }
+
+    async function openWorkspaceDirectory() {
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        lastWorkspaceHandle = dirHandle;
+        await loadWorkspaceFromHandle(dirHandle, { announce: true, remember: true });
+        reconnectWorkspaceBtn.style.display = activeMainTab === 'tasks' ? 'inline-flex' : 'none';
+      } catch (e) {
+        if (e.name !== 'AbortError') showStatus('Error: ' + e.message);
+      }
+    }
+
+    async function reconnectLastWorkspace() {
+      try {
+        if (!lastWorkspaceHandle) {
+          showStatus('No saved workspace. Select Folder first.');
+          return;
+        }
+        let permission = await lastWorkspaceHandle.queryPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+          permission = await lastWorkspaceHandle.requestPermission({ mode: 'readwrite' });
+        }
+        if (permission !== 'granted') {
+          showStatus('Permission not granted for saved workspace');
+          return;
+        }
+        await loadWorkspaceFromHandle(lastWorkspaceHandle, { announce: true, remember: true });
+      } catch (e) {
+        showStatus('Reconnect failed: ' + e.message);
+      }
+    }
+
+    async function tryAutoLoadSavedWorkspace() {
+      if (!window.showDirectoryPicker || !window.indexedDB) return;
+      try {
+        const dirHandle = await getSavedWorkspaceHandle();
+        if (!dirHandle) return;
+        lastWorkspaceHandle = dirHandle;
+
+        let permission = await dirHandle.queryPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+          reconnectWorkspaceBtn.style.display = activeMainTab === 'tasks' ? 'inline-flex' : 'none';
+          showStatus('Saved workspace found. Click Reconnect Last Folder.');
+          return;
+        }
+
+        const { taskLoaded, memoryLoaded } = await loadWorkspaceFromHandle(dirHandle, { announce: false, remember: false });
+        if (taskLoaded || memoryLoaded) {
+          reconnectWorkspaceBtn.style.display = activeMainTab === 'tasks' ? 'inline-flex' : 'none';
+          showStatus('Auto-loaded last workspace: ' + dirHandle.name);
+        }
+      } catch (e) {
+        console.log('Auto-load skipped:', e);
+      }
+    }
+
+    openTaskBtn.addEventListener('click', openWorkspaceDirectory);
+    reconnectWorkspaceBtn.addEventListener('click', reconnectLastWorkspace);
+    document.getElementById('openBtnLarge')?.addEventListener('click', openWorkspaceDirectory);
 
     saveBtn.addEventListener('click', async () => {
       if (!taskFileHandle) return;
@@ -2605,56 +2756,69 @@
         .join(' ');
     }
 
-    async function loadMemoryDirectory() {
+    async function loadMemoryFromHandle(dirHandle, options = {}) {
+      const { announce = true } = options;
+      memoryDirHandle = dirHandle;
+      memoryData = { claudeMd: null, memoryFiles: [], memoryDirs: {} };
+      activeMemorySubTab = 'overview'; // reset to Overview on new folder load
+
       try {
-        memoryDirHandle = await window.showDirectoryPicker();
+        const claudeFileHandle = await memoryDirHandle.getFileHandle('CLAUDE.md');
+        const file = await claudeFileHandle.getFile();
+        memoryData.claudeMd = { content: await file.text(), fileHandle: claudeFileHandle };
+      } catch (e) { console.log('No CLAUDE.md found'); }
 
-        memoryData = { claudeMd: null, memoryFiles: [], memoryDirs: {} };
-        activeMemorySubTab = 'overview'; // reset to Overview on new folder load
-
-        try {
-          const claudeFileHandle = await memoryDirHandle.getFileHandle('CLAUDE.md');
-          const file = await claudeFileHandle.getFile();
-          memoryData.claudeMd = { content: await file.text(), fileHandle: claudeFileHandle };
-        } catch (e) { console.log('No CLAUDE.md found'); }
-
-        try {
-          const memoryDir = await memoryDirHandle.getDirectoryHandle('memory');
-          for await (const entry of memoryDir.values()) {
-            if (entry.kind === 'file' && entry.name.endsWith('.md')) {
-              const file = await entry.getFile();
-              memoryData.memoryFiles.push({
-                name: entry.name,
-                content: await file.text(),
-                fileHandle: entry
-              });
-            } else if (entry.kind === 'directory') {
-              memoryData.memoryDirs[entry.name] = [];
-              const subDirHandle = entry;
-              for await (const subEntry of subDirHandle.values()) {
-                if (subEntry.kind === 'file' && subEntry.name.endsWith('.md')) {
-                  const file = await subEntry.getFile();
-                  const content = await file.text();
-                  memoryData.memoryDirs[entry.name].push({
-                    name: subEntry.name,
-                    content: content,
-                    fileHandle: subEntry,
-                    dirHandle: subDirHandle,
-                    parsed: parseMemoryMarkdown(content)
-                  });
-                }
+      try {
+        const memoryDir = await memoryDirHandle.getDirectoryHandle('memory');
+        for await (const entry of memoryDir.values()) {
+          if (entry.kind === 'file' && entry.name.endsWith('.md')) {
+            const file = await entry.getFile();
+            memoryData.memoryFiles.push({
+              name: entry.name,
+              content: await file.text(),
+              fileHandle: entry
+            });
+          } else if (entry.kind === 'directory') {
+            memoryData.memoryDirs[entry.name] = [];
+            const subDirHandle = entry;
+            for await (const subEntry of subDirHandle.values()) {
+              if (subEntry.kind === 'file' && subEntry.name.endsWith('.md')) {
+                const file = await subEntry.getFile();
+                const content = await file.text();
+                memoryData.memoryDirs[entry.name].push({
+                  name: subEntry.name,
+                  content: content,
+                  fileHandle: subEntry,
+                  dirHandle: subDirHandle,
+                  parsed: parseMemoryMarkdown(content)
+                });
               }
             }
           }
-        } catch (e) { console.log('No memory/ directory found'); }
+        }
+      } catch (e) { console.log('No memory/ directory found'); }
 
+      const hasMemoryContent = !!memoryData.claudeMd || memoryData.memoryFiles.length > 0 || Object.keys(memoryData.memoryDirs).length > 0;
+
+      if (hasMemoryContent) {
         renderMemory();
         memoryEmptyState.style.display = 'none';
         memoryMainContent.style.display = 'flex';
-        filePathEl.textContent = memoryDirHandle.name;
+        if (activeMainTab === 'memory') filePathEl.textContent = memoryDirHandle.name;
         refreshMemoryBtn.style.display = 'inline-flex';
-        showStatus('Loaded memory from ' + memoryDirHandle.name);
+        if (announce) showStatus('Loaded memory from ' + memoryDirHandle.name);
+      } else {
+        memoryEmptyState.style.display = 'flex';
+        memoryMainContent.style.display = 'none';
+      }
 
+      return hasMemoryContent;
+    }
+
+    async function loadMemoryDirectory() {
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+        await loadMemoryFromHandle(dirHandle);
       } catch (e) {
         if (e.name !== 'AbortError') { showStatus('Error: ' + e.message); }
       }
@@ -3258,9 +3422,9 @@
     }
 
     // Memory event listeners
-    openMemoryBtn.addEventListener('click', loadMemoryDirectory);
+    openMemoryBtn.addEventListener('click', openWorkspaceDirectory);
     refreshMemoryBtn.addEventListener('click', refreshMemoryDirectory);
-    document.getElementById('openMemoryBtnLarge').addEventListener('click', loadMemoryDirectory);
+    document.getElementById('openMemoryBtnLarge').addEventListener('click', openWorkspaceDirectory);
     document.getElementById('modalClose').addEventListener('click', closeModal);
     document.getElementById('modalCancel').addEventListener('click', closeModal);
     document.getElementById('modalSave').addEventListener('click', saveModal);
@@ -3278,6 +3442,9 @@
     window.openNewFileModal = openNewFileModal;
     window.openEditModal = openEditModal;
     window.filterMemoryDirectory = filterMemoryDirectory;
+
+    // Try to auto-load the last authorized workspace on startup.
+    tryAutoLoadSavedWorkspace();
   </script>
 </body>
 </html>

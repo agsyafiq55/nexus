@@ -1,68 +1,81 @@
 # Work Assistant (Claude Code + Skills)
 
-This repository is a personal work assistant setup for Claude Code.  
-It helps you capture and organize work across email, Slack, calendar, and meeting notes into a simple file-based task system under `memory/`.
+This repository provides a skill-driven work assistant for Claude Code with:
 
-## Important First Step
+- `TASKS.md` as the shared task board
+- `CLAUDE.md` as generated working memory (hot cache)
+- `memory/` as long-term structured memory
+- `dashboard.html` as a visual UI for tasks + memory
 
-Before using this repo, add your profile and channels in `CLAUDE.local.md`:
+## Updated Model (Current State)
 
-- `## About Me`
-- `### Slack Channels`
+The system no longer assumes `CLAUDE.md` is manually maintained.
 
-These sections are user-specific and should reflect your own identity, team context, and channel IDs.
+- `work-start` bootstraps and generates `CLAUDE.md` + `memory/` when missing.
+- `work-update` keeps tasks and memory current through interactive sync.
+- `memory-management` defines what belongs in hot memory vs deep memory.
 
-## What This Assistant Does
+## Skills in This Repo
 
-- Tracks tasks in markdown files (`memory/tasks/TASK-*.md`)
-- Keeps project context in `memory/projects/`
-- Keeps people context in `memory/people/`
-- Syncs context from multiple sources and turns it into actionable follow-ups
-- Uses Claude Code skills for repeatable workflows
+### Workflow and memory
 
-## Included Skills (Repo)
-
-These are the core skills in `.claude/skills/`:
-
-| Skill | What it does |
+| Skill | Purpose |
 |---|---|
-| `read-email` | Uses `gog` to search/read Gmail threads, summarize senders/subjects, and surface action items. |
-| `read-calendar` | Uses `gog` to view calendar events, availability, conflicts, and meeting details. |
-| `read-slack` | Uses `slack-cli.js` with Slack Web API to list channels, read messages/threads, and send messages. |
-| `read-granola` | Uses `granola-cli.py` to read/search local Granola meeting notes and transcripts. |
-| `work-sync` | Main aggregation workflow: reads all sources, updates `memory/tasks/`, and maintains `projects/` and `people/` context. |
-| `work-tasks` | Displays pending tasks with optional filtering (priority, status views, quick summaries). |
+| `work-start` | First-run initializer: checks/creates `TASKS.md`, ensures dashboard setup, and bootstraps memory (`CLAUDE.md` + `memory/`). |
+| `work-update` | Main ongoing sync flow for tasks + memory gaps, stale task triage, and context enrichment. |
+| `task-management` | Task conventions for `TASKS.md` (active, waiting, someday, done) and task update behavior. |
+| `memory-management` | Two-tier memory system: compact `CLAUDE.md` hot cache + detailed `memory/` knowledge base. |
+
+### External source readers
+
+| Skill | Purpose |
+|---|---|
+| `read-email` | Reads/searches Gmail via `gog`. |
+| `read-calendar` | Reads Google Calendar via `gog`. |
+| `read-slack` | Uses `.claude/skills/read-slack/slack-cli.js` with `@slack/web-api`. |
+| `read-granola` | Uses `.claude/skills/read-granola/granola-cli.py` for local meeting notes/transcripts. |
 
 ## Repository Structure
 
 ```text
 .
-├── CLAUDE.md
 ├── .claude/
 │   └── skills/
-│       ├── read-calendar/
+│       ├── dashboard.html
+│       ├── work-start/
+│       ├── work-update/
+│       ├── task-management/
+│       ├── memory-management/
 │       ├── read-email/
-│       ├── read-granola/
+│       ├── read-calendar/
 │       ├── read-slack/
-│       ├── work-sync/
-│       └── work-tasks/
+│       └── read-granola/
+├── TASKS.md         # generated/maintained by workflow
+├── CLAUDE.md        # generated hot-memory file
+├── dashboard.html   # copied to root for browser use
 └── memory/
-    ├── MEMORY.md
-    ├── tasks/
+    ├── glossary.md
+    ├── people/
     ├── projects/
-    └── people/
+    └── context/
 ```
+
+## Quick Start
+
+1. Install dependencies and configure authentication.
+2. Run `/work-start`.
+3. Open `dashboard.html` from your file browser.
+4. Use `/work-update` regularly to keep tasks and memory fresh.
 
 ## Prerequisites
 
-- Claude Code / Cursor setup
-- macOS (current setup target)
-- `node` (for Slack CLI helper)
-- Slack Web API package (required by `.claude/skills/read-slack/slack-cli.js`):
-  - `npm install @slack/web-api`
-- `python3` (for Granola CLI helper)
-- `gog` CLI for Gmail/Calendar:
+- Claude Code / Cursor
+- `node`
+- `python3`
+- `gog` CLI:
   - `brew install gogcli`
+- Slack Web API dependency:
+  - `npm install @slack/web-api`
 
 ## Authentication Setup
 
@@ -70,43 +83,36 @@ These are the core skills in `.claude/skills/`:
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/).
 2. Create/select a project.
-3. Enable APIs:
+3. Enable these APIs:
    - Gmail API
    - Google Calendar API
-4. Configure OAuth consent screen (External/Internal as needed).
-5. Create OAuth Client ID credentials (Desktop App is recommended for local CLI usage).
-6. Download the OAuth client JSON (for example: `~/Downloads/client_secret.json`).
-7. Configure `gog` with your credentials:
+4. Configure OAuth consent screen.
+5. Create OAuth Client credentials (Desktop App recommended).
+6. Download OAuth client JSON (example: `~/Downloads/client_secret.json`).
+7. Configure `gog`:
    - `gog auth credentials ~/Downloads/client_secret.json`
-8. Add and authorize your Google account:
+8. Authorize account:
    - `gog auth add you@gmail.com`
-9. Optionally set a default account:
+9. Set default account (optional):
    - `gog auth manage`
    - or `export GOG_ACCOUNT=you@gmail.com`
 
-### Slack (User Token for Slack Web API)
+### Slack (User token with required scopes)
 
-1. Go to [Slack API Apps](https://api.slack.com/apps) and create/select an app.
+1. Open [Slack API Apps](https://api.slack.com/apps), then create/select your app.
 2. In **OAuth & Permissions**, add **User Token Scopes**:
    - `channels:history`, `groups:history`, `im:history`, `mpim:history`
    - `channels:read`, `groups:read`, `users:read`
    - `chat:write`
-3. Install/Reinstall the app to workspace.
-4. Copy the **User OAuth Token** (starts with `xoxp-`).
-5. Export token in your shell:
+3. Install/Reinstall app to workspace.
+4. Copy User OAuth token (`xoxp-...`).
+5. Export token:
    - `export SLACK_TOKEN=xoxp-your-token`
-6. Verify Slack auth works:
+6. Verify:
    - `node .claude/skills/read-slack/slack-cli.js test`
 
-## Typical Workflow
+## Operating Notes
 
-1. Run `/work-sync` to pull latest context from all sources.
-2. Review current priorities with `/work-tasks`.
-3. Focus on high-priority tasks (`/work-tasks high`).
-4. Repeat sync after key meetings or message bursts.
-
-## Notes
-
-- Task files are intentionally plain markdown for easy review and git history.
-- Calendar is treated as context (events/deadlines), not an automatic task generator.
-- Completed tasks can be archived by the sync workflow into `memory/tasks/completed/`.
+- `work-update` is intentionally interactive: it asks before creating/updating tasks and memory entries.
+- `CLAUDE.md` should remain compact; detailed context lives in `memory/`.
+- If key files are missing, run `/work-start` to repair/bootstrap the system.
