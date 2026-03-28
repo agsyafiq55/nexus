@@ -7,9 +7,7 @@ description: Sync all work context from external sources, create/update task/mem
 
 > If you see unfamiliar placeholders or need to check which skills are available in `.claude/skills`
 
-Keep your task list and memory current. Two modes:
-
-- **Default:** Sync tasks from external tools, triage stale items, check memory for gaps
+Load `memory-management` and `task-management` skill before continuing.
 
 ## Usage
 
