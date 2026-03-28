@@ -13,11 +13,14 @@ const web = new WebClient(token);
 const commands = {
   async channels() {
     const result = await web.conversations.list({
-      types: 'public_channel,private_channel',
-      limit: 100
+      types: 'public_channel,private_channel,mpim,im',
+      limit: 200
     });
     result.channels.forEach(c => {
-      console.log(`${c.name} | ${c.id} | ${c.num_members} members`);
+      const type = c.is_mpim ? 'group-dm' : c.is_im ? 'dm' : c.is_private ? 'private' : 'public';
+      const name = c.name || c.name_normalized || (c.user ? `DM:${c.user}` : 'unnamed');
+      const members = c.num_members || c.num_members === 0 ? c.num_members : '-';
+      console.log(`${name} | ${c.id} | ${type} | ${members} members`);
     });
   },
 
@@ -34,8 +37,8 @@ const commands = {
 
   async readByName(channelName, limit = 5) {
     const list = await web.conversations.list({
-      types: 'public_channel,private_channel',
-      limit: 100
+      types: 'public_channel,private_channel,mpim,im',
+      limit: 200
     });
     const channel = list.channels.find(c => c.name === channelName);
     if (!channel) {
