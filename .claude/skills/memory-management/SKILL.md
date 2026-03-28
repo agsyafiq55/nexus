@@ -74,6 +74,14 @@ This tiered approach keeps CLAUDE.md lean (~100 lines) while supporting unlimite
 - **Working memory:** `CLAUDE.md` in current working directory
 - **Deep memory:** `memory/` subdirectory
 
+## Link Format (CRITICAL — always use these when writing to files)
+| Writing in | Link to people | Link to projects |
+|-----------|---------------|-----------------|
+| CLAUDE.md or TASKS.md | `[Name](memory/people/name.md)` | `[Project](memory/projects/file.md)` |
+| memory/glossary.md | `[Name](people/name.md)` | `[Project](projects/file.md)` |
+| memory/people/*.md | `[Other person](othername.md)` | `[Project](../projects/file.md)` |
+| memory/projects/*.md | `[Person](../people/name.md)` | — |
+
 ## Working Memory Format (CLAUDE.md)
 
 Use tables for compactness. Target ~50-80 lines total.
@@ -307,14 +315,6 @@ Use `/work-start` to initialize by scanning your chat, calendar, email, and docu
 | Company context | Quick reference only | context/company.md |
 | Preferences | All preferences | - |
 | Historical/stale | ✗ Remove | ✓ Keep in memory/ |
-
-### Link Format (CRITICAL — always use these when writing to files)
-| Writing in | Link to people | Link to projects |
-|-----------|---------------|-----------------|
-| CLAUDE.md or TASKS.md | `[Name](memory/people/name.md)` | `[Project](memory/projects/file.md)` |
-| memory/glossary.md | `[Name](people/name.md)` | `[Project](projects/file.md)` |
-| memory/people/*.md | `[Other person](othername.md)` | `[Project](../projects/file.md)` |
-| memory/projects/*.md | `[Person](../people/name.md)` | — |
 
 ## Promotion / Demotion
 

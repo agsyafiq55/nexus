@@ -45,7 +45,7 @@ When creating a new TASKS.md, use this exact template (without example tasks):
 ```
 
 Task format:
-- `- [ ] **Task title** - Note with [Person](memory/people/name.md) link _(added YYYY-MM-DD)_`
+- `- [ ] **Task title** - [Project](memory/projects/file.md) link, Note with [Person](memory/people/name.md) link _(added YYYY-MM-DD)_`
 - Sub-bullets for additional details
 - Completed: `- [x] ~~Task~~ (date)`
 
