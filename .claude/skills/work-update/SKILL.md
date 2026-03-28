@@ -43,10 +43,11 @@ Present diff and let user decide what to add/complete.
 ### 3. Scan Activity Sources
 
 Gather data from available MCP sources:
-- **Chat:** Search recent messages, read active channels
-- **Email:** Search sent messages
+- **Chat:** Search recent messages/threads/replies, read active channels
+- **Email:** Search recent messages
 - **Documents:** List recently touched docs
 - **Calendar:** List recent + upcoming events
+- **Notes**: Search meeting notes
 
 ### 4. Flag Missed Todos
 

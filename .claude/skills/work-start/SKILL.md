@@ -9,6 +9,8 @@ description: Setup productivity system for work
 
 Initialize the task and memory systems, then open the unified dashboard.
 
+Load `memory-management` and `task-management` skill before continuing.
+
 ## Instructions
 
 ### 1. Check What Exists
