@@ -197,9 +197,10 @@ const commands = {
     const channelId = positional[0];
     if (!channelId) throw new Error('Channel ID required');
 
+    const daysOldest = flags.days ? toEpochDaysAgo(flags.days) : null;
     const messages = await fetchHistory(channelId, {
       limit: flags.limit || 50,
-      oldest: flags.oldest,
+      oldest: flags.oldest || daysOldest,
       latest: flags.latest,
       cursor: flags.cursor,
       inclusive: flags.inclusive === true
@@ -333,8 +334,86 @@ const commands = {
     printHumanMessages(rows);
   },
 
-  async send(channel, text) {
-    const result = await web.chat.postMessage({ channel, text });
+  async threadScan(args) {
+    const { positional, flags } = parseArgs(args);
+    const channelId = positional[0];
+    if (!channelId) throw new Error('Channel ID required');
+
+    const parentPatternInput = flags['parent-pattern'] || flags.parent_pattern || '.*';
+    const replyPatternInput = flags['reply-pattern'] || flags.reply_pattern || null;
+    const replyUser = flags['reply-user'] || flags.reply_user || null;
+
+    const parentRegex = new RegExp(parentPatternInput, flags.case === 'sensitive' ? '' : 'i');
+    const replyRegex = replyPatternInput
+      ? new RegExp(replyPatternInput, flags.case === 'sensitive' ? '' : 'i')
+      : null;
+
+    const limit = toInt(flags.limit, 200);
+    const maxThreads = toInt(flags['max-threads'] || flags.max_threads, 25);
+    const replyLimit = toInt(flags['reply-limit'] || flags.reply_limit, 200);
+    const oldest = flags.days ? toEpochDaysAgo(flags.days) : flags.oldest;
+
+    const messages = await fetchHistory(channelId, { limit, oldest, latest: flags.latest });
+    const parents = messages
+      .filter((m) => (m.reply_count || 0) > 0 && parentRegex.test(m.text || ''))
+      .slice(0, maxThreads);
+
+    const results = [];
+    for (const parent of parents) {
+      const resp = await web.conversations.replies({
+        channel: channelId,
+        ts: parent.ts,
+        limit: replyLimit
+      });
+
+      const replies = (resp.messages || []).filter((m) => m.ts !== parent.ts);
+      const matchedReplies = replies.filter((m) => {
+        if (replyUser && m.user !== replyUser) return false;
+        if (replyRegex && !replyRegex.test(m.text || '')) return false;
+        return true;
+      });
+
+      if (replyUser || replyRegex) {
+        if (matchedReplies.length > 0) {
+          results.push({
+            parent: messagesToRows(channelId, [parent])[0],
+            matches: messagesToRows(channelId, matchedReplies)
+          });
+        }
+      } else {
+        results.push({
+          parent: messagesToRows(channelId, [parent])[0],
+          matches: messagesToRows(channelId, replies)
+        });
+      }
+    }
+
+    if (flags.json) {
+      printResult({
+        channel_id: channelId,
+        parent_pattern: parentPatternInput,
+        reply_pattern: replyPatternInput,
+        reply_user: replyUser,
+        scanned_threads: parents.length,
+        matched_threads: results.length,
+        results
+      }, true);
+      return;
+    }
+
+    results.forEach((entry) => {
+      console.log(`[PARENT ${entry.parent.time}] ${compactText(entry.parent.text, 220)}`);
+      console.log(`  thread_ts=${entry.parent.thread_ts || entry.parent.ts} replies=${entry.parent.reply_count}`);
+      entry.matches.forEach((m) => {
+        console.log(`    [${m.time}] ${m.user_id || m.bot_id || 'unknown'}: ${compactText(m.text, 220)}`);
+      });
+    });
+  },
+
+  async send(channel, text, threadTs) {
+    const payload = { channel, text };
+    if (threadTs) payload.thread_ts = threadTs;
+    const result = await web.chat.postMessage(payload);
     console.log(`Sent: ${result.ts}`);
   },
 
@@ -491,17 +570,18 @@ async function main() {
 
 Commands:
   channels
-  history <channelId> [--limit N] [--oldest ts] [--latest ts] [--json]
+  history <channelId> [--limit N] [--days N] [--oldest ts] [--latest ts] [--json]
   search <query> [--channels C1,C2] [--days N] [--limit N] [--json]
   messages-filter <channelId> --pattern <regex> [--days N] [--limit N] [--json]
   threads <channelId> [--days N] [--limit N] [--json]
   thread-get <channelId> <threadTs> [--limit N] [--json]
+  thread-scan <channelId> [--parent-pattern regex] [--reply-pattern regex] [--reply-user U...] [--days N] [--json]
   users-resolve --ids U1,U2 [--json]
   channels-resolve --ids C1,C2 [--json]
   extract <channelId> --mode blockers|tasks|decisions|risks [--days N] [--limit N] [--json]
   export <channelId> [--format json|csv|md] [--out path] [--days N] [--limit N]
 
-  send <channel> <text>
+  send <channel> <text> [--thread-ts ts]
   files <channelId> [limit]
   download <fileId> [path]
   test
@@ -531,6 +611,9 @@ Environment:
       case 'thread-get':
         await commands.threadGet(args);
         break;
+      case 'thread-scan':
+        await commands.threadScan(args);
+        break;
       case 'users-resolve':
         await commands.usersResolve(args);
         break;
@@ -544,9 +627,14 @@ Environment:
         await commands.exportCmd(args);
         break;
       case 'send':
-        if (!args[0] || !args[1]) throw new Error('Channel and text required');
-        await commands.send(args[0], args.slice(1).join(' '));
+      {
+        const parsed = parseArgs(args);
+        const channel = parsed.positional[0];
+        const text = parsed.positional.slice(1).join(' ');
+        if (!channel || !text) throw new Error('Channel and text required');
+        await commands.send(channel, text, parsed.flags['thread-ts'] || parsed.flags.thread_ts);
         break;
+      }
       case 'test':
         await commands.test();
         break;
