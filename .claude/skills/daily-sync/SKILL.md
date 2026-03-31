@@ -21,6 +21,33 @@ Post a structured daily update to the active daily thread in `<DAILY_SYNC_CHANNE
 
 Ask these one-by-one (or as one 3-part prompt), collect answers, then post once all 3 are answered.
 
+## Suggested Answers (default behavior)
+
+Before asking the 3 required questions, draft suggested answers using:
+- Current session history (recent user-assistant work completed in this session)
+- `TASKS.md` status and recent edits
+- `memory/projects/*.md` and `memory/people/*.md` context relevant to active work
+
+Then present the 3 questions with the `question` tool (not plain text), and include the suggested answer as an option for each question.
+
+For each question:
+- Option 1 must be the suggested answer, labeled as recommended.
+- Keep option labels short (e.g., `Use suggestion`).
+- Put the detailed suggested content in the option description.
+- Keep custom input enabled so the user can type their own answer.
+
+Use this exact question structure:
+
+1. What did you complete since the last update?
+2. What are you focusing on today?
+3. Any blockers or dependencies?
+
+Rules:
+- Keep suggestions concise and factual. Do not invent progress.
+- If confidence is low for any field, leave it blank and ask the user to fill it.
+- Treat user corrections as final.
+- If the user selects the suggested options, post directly without re-asking.
+
 ## Thread Selection ("correct thread")
 
 Use the Slack CLI from `read-slack` skill:
