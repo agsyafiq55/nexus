@@ -12,6 +12,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
+      color-scheme: light dark;
       --bg-primary: #faf9f5;
       --bg-secondary: #F5F4EF;
       --bg-card: #ffffff;
@@ -24,6 +25,32 @@
       --border-light: #eeeee9;
       --shadow: rgba(20, 20, 19, 0.04);
       --shadow-hover: rgba(20, 20, 19, 0.08);
+      --text-on-accent: #ffffff;
+      --drag-accent-bg: rgba(217, 119, 87, 0.05);
+      --overlay: rgba(20, 20, 19, 0.5);
+      --shadow-strong: rgba(20, 20, 19, 0.2);
+      --shadow-toast: rgba(20, 20, 19, 0.15);
+      --icon-lines: #c4c4c2;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #161615;
+        --bg-secondary: #21211f;
+        --bg-card: #2a2a28;
+        --text-primary: #f2f2ee;
+        --text-secondary: #cecec8;
+        --text-muted: #9f9f99;
+        --border: #3e3e3b;
+        --border-light: #343431;
+        --shadow: rgba(0, 0, 0, 0.25);
+        --shadow-hover: rgba(0, 0, 0, 0.4);
+        --drag-accent-bg: rgba(217, 119, 87, 0.16);
+        --overlay: rgba(0, 0, 0, 0.62);
+        --shadow-strong: rgba(0, 0, 0, 0.6);
+        --shadow-toast: rgba(0, 0, 0, 0.4);
+        --icon-lines: #7c7c77;
+      }
     }
 
     body {
@@ -113,7 +140,7 @@
 
     button.primary {
       background: var(--accent);
-      color: white;
+      color: var(--text-on-accent);
       border-color: var(--accent);
     }
 
@@ -196,7 +223,7 @@
     }
 
     .cards.drag-over {
-      background: rgba(217, 119, 87, 0.05);
+      background: var(--drag-accent-bg);
       border-radius: 8px;
     }
 
@@ -315,7 +342,7 @@
       content: '';
       width: 5px;
       height: 9px;
-      border: solid white;
+      border: solid var(--text-on-accent);
       border-width: 0 2px 2px 0;
       transform: rotate(45deg);
       margin-bottom: 2px;
@@ -332,7 +359,7 @@
       padding: 14px 28px;
       background: var(--accent);
       border: none;
-      color: white;
+      color: var(--text-on-accent);
     }
 
     .empty-state button:hover {
@@ -352,7 +379,7 @@
       font-weight: 500;
       opacity: 0;
       transition: opacity 0.2s ease;
-      box-shadow: 0 4px 20px rgba(20, 20, 19, 0.15);
+      box-shadow: 0 4px 20px var(--shadow-toast);
       z-index: 200;
     }
 
@@ -433,7 +460,7 @@
     }
 
     .list-section.drag-over {
-      background: rgba(217, 119, 87, 0.05);
+      background: var(--drag-accent-bg);
       border-radius: 8px;
       margin: 0 -12px 32px;
       padding: 0 12px;
@@ -1029,7 +1056,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(20, 20, 19, 0.5);
+      background: var(--overlay);
       z-index: 100;
       align-items: center;
       justify-content: center;
@@ -1048,7 +1075,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 20px 60px rgba(20, 20, 19, 0.2);
+      box-shadow: 0 20px 60px var(--shadow-strong);
     }
 
     .modal-header {
@@ -1193,12 +1220,12 @@
   <header>
     <div class="header-left">
       <svg width="28" height="28" viewBox="0 0 32 32" style="margin-right: 12px; flex-shrink: 0;">
-        <rect x="4" y="2" width="24" height="28" rx="4" fill="#faf9f5" stroke="#D97757" stroke-width="2"/>
+        <rect x="4" y="2" width="24" height="28" rx="4" fill="var(--bg-secondary)" stroke="var(--accent)" stroke-width="2"/>
         <rect x="8" y="0" width="16" height="5" rx="2.5" fill="#D97757"/>
         <path d="M9 13l3 3 5-5" fill="none" stroke="#D97757" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <rect x="20" y="12" width="5" height="2" rx="1" fill="#c4c4c2"/>
-        <rect x="9" y="20" width="10" height="2" rx="1" fill="#c4c4c2"/>
-        <rect x="9" y="25" width="7" height="2" rx="1" fill="#c4c4c2"/>
+        <rect x="20" y="12" width="5" height="2" rx="1" fill="var(--icon-lines)"/>
+        <rect x="9" y="20" width="10" height="2" rx="1" fill="var(--icon-lines)"/>
+        <rect x="9" y="25" width="7" height="2" rx="1" fill="var(--icon-lines)"/>
       </svg>
       <div>
         <h1>Productivity</h1>
@@ -2517,6 +2544,17 @@
     const HANDLE_STORE_NAME = 'handles';
     const WORKSPACE_HANDLE_KEY = 'workspaceDir';
     let lastWorkspaceHandle = null;
+    const hasNativeDirectoryPicker = typeof window.showDirectoryPicker === 'function';
+    const fallbackDirectoryInput = (() => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.setAttribute('webkitdirectory', '');
+      input.setAttribute('directory', '');
+      input.style.display = 'none';
+      document.body.appendChild(input);
+      return input;
+    })();
 
     function openHandleDb() {
       return new Promise((resolve, reject) => {
@@ -2585,12 +2623,169 @@
       return { taskLoaded, memoryLoaded };
     }
 
+    function buildPickedFileIndex(fileList) {
+      const files = Array.from(fileList || []);
+      const byRelativePath = new Map();
+      let folderName = '';
+
+      for (const file of files) {
+        const rawPath = (file.webkitRelativePath || file.name || '').replace(/\\/g, '/');
+        const parts = rawPath.split('/').filter(Boolean);
+        if (!parts.length) continue;
+
+        if (!folderName && parts.length > 1) folderName = parts[0];
+        const relativePath = parts.length > 1 ? parts.slice(1).join('/') : parts[0];
+        byRelativePath.set(relativePath, file);
+      }
+
+      if (!folderName) folderName = files[0]?.name || 'selected folder';
+      return { files, byRelativePath, folderName };
+    }
+
+    async function pickDirectoryViaFileInput() {
+      return new Promise((resolve, reject) => {
+        const input = fallbackDirectoryInput;
+        input.value = '';
+
+        const onChange = () => {
+          cleanup();
+          if (!input.files || input.files.length === 0) {
+            reject(new DOMException('No folder selected', 'AbortError'));
+            return;
+          }
+          resolve(buildPickedFileIndex(input.files));
+        };
+
+        const onFocus = () => {
+          // If focus returns without a file selection, treat as cancel.
+          setTimeout(() => {
+            if (!input.files || input.files.length === 0) {
+              cleanup();
+              reject(new DOMException('No folder selected', 'AbortError'));
+            }
+          }, 250);
+        };
+
+        const cleanup = () => {
+          input.removeEventListener('change', onChange);
+          window.removeEventListener('focus', onFocus);
+        };
+
+        input.addEventListener('change', onChange, { once: true });
+        window.addEventListener('focus', onFocus, { once: true });
+        input.click();
+      });
+    }
+
+    async function loadMemoryFromPickedFiles(indexedFiles, options = {}) {
+      const { announce = true } = options;
+      memoryDirHandle = null;
+      memoryData = { claudeMd: null, memoryFiles: [], memoryDirs: {} };
+      activeMemorySubTab = 'overview';
+
+      const claudeFile = indexedFiles.byRelativePath.get('CLAUDE.md');
+      if (claudeFile) {
+        memoryData.claudeMd = { content: await claudeFile.text(), fileHandle: null };
+      }
+
+      for (const [relativePath, file] of indexedFiles.byRelativePath.entries()) {
+        if (!relativePath.startsWith('memory/') || !relativePath.endsWith('.md')) continue;
+        const pathAfterMemory = relativePath.slice('memory/'.length);
+        if (!pathAfterMemory) continue;
+
+        const parts = pathAfterMemory.split('/').filter(Boolean);
+        const content = await file.text();
+
+        if (parts.length === 1) {
+          memoryData.memoryFiles.push({
+            name: parts[0],
+            content,
+            fileHandle: null
+          });
+        } else if (parts.length === 2) {
+          const dirName = parts[0];
+          const fileName = parts[1];
+          if (!memoryData.memoryDirs[dirName]) memoryData.memoryDirs[dirName] = [];
+          memoryData.memoryDirs[dirName].push({
+            name: fileName,
+            content,
+            fileHandle: null,
+            dirHandle: null,
+            parsed: parseMemoryMarkdown(content)
+          });
+        }
+      }
+
+      const hasMemoryContent = !!memoryData.claudeMd || memoryData.memoryFiles.length > 0 || Object.keys(memoryData.memoryDirs).length > 0;
+
+      if (hasMemoryContent) {
+        renderMemory();
+        memoryEmptyState.style.display = 'none';
+        memoryMainContent.style.display = 'flex';
+        if (announce) showStatus('Loaded memory (read-only fallback mode)');
+      } else {
+        memoryEmptyState.style.display = 'flex';
+        memoryMainContent.style.display = 'none';
+      }
+
+      refreshMemoryBtn.style.display = 'none';
+      return hasMemoryContent;
+    }
+
+    async function loadWorkspaceFromPickedFiles(indexedFiles, options = {}) {
+      const { announce = true } = options;
+      const taskFile = indexedFiles.byRelativePath.get('TASKS.md');
+      let taskLoaded = false;
+
+      if (taskFile) {
+        const content = await taskFile.text();
+        lastModified = taskFile.lastModified;
+        const result = parseTaskMarkdown(content);
+        sections = result.sections;
+        tasks = result.tasks;
+        taskFileHandle = null; // no write access in fallback mode
+        taskFileName = 'TASKS.md';
+        hasChanges = false;
+        saveBtn.disabled = true;
+        switchTaskView('board');
+        stopWatching();
+        boardEmptyState.style.display = 'none';
+        taskLoaded = true;
+      }
+
+      const memoryLoaded = await loadMemoryFromPickedFiles(indexedFiles, { announce: false });
+
+      lastWorkspaceHandle = null;
+      reconnectWorkspaceBtn.style.display = 'none';
+      filePathEl.textContent = indexedFiles.folderName;
+
+      if (announce) {
+        if (taskLoaded && memoryLoaded) {
+          showStatus('Loaded TASKS.md and memory from ' + indexedFiles.folderName + ' (read-only mode)');
+        } else if (taskLoaded) {
+          showStatus('Loaded TASKS.md from ' + indexedFiles.folderName + ' (read-only mode)');
+        } else if (memoryLoaded) {
+          showStatus('Loaded memory from ' + indexedFiles.folderName + ' (read-only mode)');
+        } else {
+          showStatus('No TASKS.md or memory data found in ' + indexedFiles.folderName);
+        }
+      }
+
+      return { taskLoaded, memoryLoaded };
+    }
+
     async function openWorkspaceDirectory() {
       try {
-        const dirHandle = await window.showDirectoryPicker();
-        lastWorkspaceHandle = dirHandle;
-        await loadWorkspaceFromHandle(dirHandle, { announce: true, remember: true });
-        reconnectWorkspaceBtn.style.display = activeMainTab === 'tasks' ? 'inline-flex' : 'none';
+        if (hasNativeDirectoryPicker) {
+          const dirHandle = await window.showDirectoryPicker();
+          lastWorkspaceHandle = dirHandle;
+          await loadWorkspaceFromHandle(dirHandle, { announce: true, remember: true });
+          reconnectWorkspaceBtn.style.display = activeMainTab === 'tasks' ? 'inline-flex' : 'none';
+          return;
+        }
+
+        const indexedFiles = await pickDirectoryViaFileInput();
+        await loadWorkspaceFromPickedFiles(indexedFiles, { announce: true });
       } catch (e) {
         if (e.name !== 'AbortError') showStatus('Error: ' + e.message);
       }
@@ -2645,7 +2840,10 @@
     document.getElementById('openBtnLarge')?.addEventListener('click', openWorkspaceDirectory);
 
     saveBtn.addEventListener('click', async () => {
-      if (!taskFileHandle) return;
+      if (!taskFileHandle) {
+        showStatus('Read-only mode: select folder in supported browser to save');
+        return;
+      }
       try {
         const writable = await taskFileHandle.createWritable();
         await writable.write(toMarkdown());
@@ -3287,6 +3485,10 @@
 
       try {
         if (type === 'claudeMd') {
+          if (!memoryData.claudeMd?.fileHandle) {
+            showStatus('Read-only mode: select folder in supported browser to save');
+            return;
+          }
           memoryData.claudeMd.content = content;
           const writable = await memoryData.claudeMd.fileHandle.createWritable();
           await writable.write(content);
@@ -3297,6 +3499,10 @@
           const fileName = modalOverlay.dataset.fileName;
           const file = memoryData.memoryFiles.find(f => f.name === fileName);
           if (file) {
+            if (!file.fileHandle) {
+              showStatus('Read-only mode: select folder in supported browser to save');
+              return;
+            }
             file.content = content;
             const writable = await file.fileHandle.createWritable();
             await writable.write(content);
@@ -3310,6 +3516,10 @@
           const files = memoryData.memoryDirs[dirName];
           const file = files.find(f => f.name === fileName);
           if (file) {
+            if (!file.fileHandle) {
+              showStatus('Read-only mode: select folder in supported browser to save');
+              return;
+            }
             file.content = content;
             file.parsed = parseMemoryMarkdown(content);
             const writable = await file.fileHandle.createWritable();
@@ -3323,6 +3533,10 @@
           let fileName = document.getElementById('newFileName').value.trim();
           if (!fileName) { showStatus('Please enter a filename'); return; }
           if (!fileName.endsWith('.md')) fileName += '.md';
+          if (!memoryDirHandle) {
+            showStatus('Read-only mode: select folder in supported browser to create files');
+            return;
+          }
 
           const memoryDir = await memoryDirHandle.getDirectoryHandle('memory');
           const subDir = await memoryDir.getDirectoryHandle(dirName, { create: true });
