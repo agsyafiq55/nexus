@@ -148,6 +148,14 @@ async function resolveChannels(channelIds) {
   return result;
 }
 
+async function openDirectMessage(userId) {
+  const resp = await web.conversations.open({ users: userId });
+  if (!resp.ok || !resp.channel || !resp.channel.id) {
+    throw new Error(`Unable to open DM for user ${userId}`);
+  }
+  return resp.channel.id;
+}
+
 function messagesToRows(channelId, messages) {
   return (messages || []).map((m) => ({
     channel_id: channelId,
@@ -230,6 +238,39 @@ const commands = {
       return;
     }
 
+    printHumanMessages(rows);
+  },
+
+  async dmHistory(args) {
+    const { positional, flags } = parseArgs(args);
+    const userId = positional[0];
+    if (!userId) throw new Error("User ID required");
+
+    const channelId = await openDirectMessage(userId);
+    const daysOldest = flags.days ? toEpochDaysAgo(flags.days) : null;
+    const messages = await fetchHistory(channelId, {
+      limit: flags.limit || 50,
+      oldest: flags.oldest || daysOldest,
+      latest: flags.latest,
+      cursor: flags.cursor,
+      inclusive: flags.inclusive === true,
+    });
+
+    const rows = messagesToRows(channelId, messages);
+    if (flags.json) {
+      printResult(
+        {
+          user_id: userId,
+          channel_id: channelId,
+          count: rows.length,
+          messages: rows,
+        },
+        true,
+      );
+      return;
+    }
+
+    console.log(`DM channel: ${channelId}`);
     printHumanMessages(rows);
   },
 
@@ -718,6 +759,7 @@ async function main() {
 Commands:
   channels
   history <channelId> [--limit N] [--days N] [--oldest ts] [--latest ts] [--json]
+  dm-history <userId> [--limit N] [--days N] [--oldest ts] [--latest ts] [--json]
   search <query> [--channels C1,C2] [--days N] [--limit N] [--json]
   messages-filter <channelId> --pattern <regex> [--days N] [--limit N] [--json]
   threads <channelId> [--days N] [--limit N] [--json]
@@ -745,6 +787,9 @@ Environment:
         break;
       case "history":
         await commands.history(args);
+        break;
+      case "dm-history":
+        await commands.dmHistory(args);
         break;
       case "search":
         await commands.search(args);
