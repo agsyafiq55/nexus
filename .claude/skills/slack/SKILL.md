@@ -45,7 +45,7 @@ Get your token from https://api.slack.com/apps:
 2. OAuth & Permissions → **User Token Scopes**:
    - `channels:history`, `groups:history`, `im:history`, `mpim:history`
    - `channels:read`, `groups:read`, `users:read`
-   - `chat:write`
+   - `chat:write`, `im:write`
    - `files:read`
 3. Install to workspace (as yourself)
 4. Copy "User OAuth Token" (starts with `xoxp-`)
