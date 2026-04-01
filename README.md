@@ -111,8 +111,8 @@ This repository provides a skill-driven work assistant for Claude Code / Opencod
    - `chat:write`
 3. Install/Reinstall app to workspace.
 4. Copy User OAuth token (`xoxp-...`).
-5. Export token:
-   - `export SLACK_TOKEN=xoxp-your-token`
+5. Create `.env` file and save your token in it:
+   - `SLACK_TOKEN=xoxp-your-token`
 6. Verify:
    - `node .claude/skills/slack/slack-cli.js test`
 

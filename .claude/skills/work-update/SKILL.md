@@ -155,6 +155,17 @@ Update complete:
 - All tasks decoded ✓
 ```
 
+### 11. Memory Backup
+
+If this run changed any of these:
+- `CLAUDE.md`
+- `TASKS.md`
+- anything under `memory/`
+
+Then trigger the `memory-backup` skill.
+
+Only trigger the backup if files were actually changed. If nothing changed in tasks or memory, skip it.
+
 ## Notes
 
 - Never auto-add tasks or memories without user confirmation
@@ -162,3 +173,4 @@ Update complete:
 - Fuzzy matching on task titles handles minor wording differences
 - Safe to run frequently — only updates when there's new info
 - This command always runs interactively
+- When `TASKS.md`, `CLAUDE.md`, or `memory/` changes, finish by triggering `/memory-backup`
