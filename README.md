@@ -30,12 +30,12 @@ This repository provides a skill-driven work assistant for Claude Code / Opencod
 
 | Skill | Purpose |
 |---|---|
-| `gmail` | Reads/searches Gmail via `gog`. |
+| `gmail` | Reads and searches Gmail via `gog`. |
 | `google-calendar` | Reads Google Calendar via `gog`. |
-| `google-drive` | Reads/searches Google Drive folders and files via `gog`. |
-| `slack` | Uses `.claude/skills/slack/slack-cli.js` with `@slack/web-api`. |
-| `granola` | Uses `.claude/skills/granola/granola-cli.py` for local meeting notes/transcripts. |
-| `notebooklm` | Uses `notebooklm-py` to manage NotebookLM notebooks, sources, chats, and generated artifacts. |
+| `google-drive` | Reads and searches Google Drive folders and files via `gog`. |
+| `slack` | Reads and sends Slack messages via `.claude/skills/slack/slack-cli.js` with `@slack/web-api`. |
+| `granola` | Reads local meeting notes/transcripts via `.claude/skills/granola/granola-cli.py` |
+| `notebooklm` | Manages NotebookLM notebooks, sources, chats, and generated artifacts via `notebooklm-py`. |
 
 ## Repository Structure
 
